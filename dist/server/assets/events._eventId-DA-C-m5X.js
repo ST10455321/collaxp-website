@@ -1,0 +1,280 @@
+import { t as Reveal } from "./Reveal-4T7NNWSK.js";
+import { u as Button } from "./auth-DVlmHz9A.js";
+import { n as Route, o as useAuth, r as useAddToCart } from "./router-Bmo75UHY.js";
+import { a as getMyRegistration, d as registerForEvent, t as cancelMyRegistrationsForEvent } from "./registrations-CNP-eODM.js";
+import { r as getEvent } from "./events-CDmwh__r.js";
+import { _ as formatDate, g as eventTypeLabel, v as formatPrice, y as isRsvpType } from "./helpers-OIPvucp0.js";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, CalendarDays, Clock, MapPin, ShieldAlert, ShoppingCart, Ticket, Zap } from "lucide-react";
+import { toast } from "sonner";
+// src/routes/events.$eventId.tsx?tsr-split=component
+function EventDetails() {
+	const { eventId } = Route.useParams();
+	const { user, role } = useAuth();
+	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+	const addToCart = useAddToCart();
+	const { data: event, isLoading } = useQuery({
+		queryKey: ["event", eventId],
+		queryFn: () => getEvent(eventId)
+	});
+	const { data: registration } = useQuery({
+		queryKey: [
+			"registration",
+			eventId,
+			user?.id
+		],
+		enabled: Boolean(user?.id),
+		queryFn: () => getMyRegistration(eventId, user.id)
+	});
+	const register = useMutation({
+		mutationFn: () => registerForEvent(user.id, eventId),
+		onSuccess: (data) => {
+			toast.success(`You're in! Ticket ${data.ticket_no}`, { description: "Find it under My Events." });
+			queryClient.invalidateQueries({ queryKey: ["registration", eventId] });
+			queryClient.invalidateQueries({ queryKey: ["my-events"] });
+			queryClient.invalidateQueries({ queryKey: ["notifications"] });
+		},
+		onError: (error) => toast.error(error.message)
+	});
+	const cancel = useMutation({
+		mutationFn: () => cancelMyRegistrationsForEvent(user.id, eventId),
+		onSuccess: () => {
+			toast.success("Registration cancelled");
+			queryClient.invalidateQueries({ queryKey: ["registration", eventId] });
+			queryClient.invalidateQueries({ queryKey: ["my-events"] });
+		},
+		onError: (error) => toast.error(error.message)
+	});
+	if (isLoading) return /* @__PURE__ */ jsx("div", {
+		className: "mx-auto w-full max-w-4xl px-4 py-16",
+		children: /* @__PURE__ */ jsx("div", { className: "panel h-96 animate-pulse" })
+	});
+	if (!event) return /* @__PURE__ */ jsxs("div", {
+		className: "mx-auto w-full max-w-2xl px-4 py-24 text-center",
+		children: [
+			/* @__PURE__ */ jsx("h1", {
+				className: "text-2xl",
+				children: "Event not found"
+			}),
+			/* @__PURE__ */ jsx("p", {
+				className: "mt-2 text-sm text-muted-foreground",
+				children: "This event may have been removed by its organiser."
+			}),
+			/* @__PURE__ */ jsx(Button, {
+				className: "mt-6",
+				asChild: true,
+				children: /* @__PURE__ */ jsx(Link, {
+					to: "/discover",
+					children: "Back to Explore"
+				})
+			})
+		]
+	});
+	return /* @__PURE__ */ jsxs("div", {
+		className: "mx-auto w-full max-w-5xl px-4 py-10 sm:px-6",
+		children: [
+			/* @__PURE__ */ jsxs(Link, {
+				to: "/discover",
+				className: "inline-flex items-center gap-2 font-display text-xs uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary",
+				children: [/* @__PURE__ */ jsx(ArrowLeft, { className: "h-4 w-4" }), " Explore"]
+			}),
+			/* @__PURE__ */ jsxs("div", {
+				className: "mt-6 grid gap-8 md:grid-cols-[1.1fr_0.9fr]",
+				children: [/* @__PURE__ */ jsx(Reveal, {
+					className: "panel overflow-hidden",
+					children: /* @__PURE__ */ jsx("div", {
+						className: "aspect-[4/3] bg-surface-2",
+						children: event.poster_url ? /* @__PURE__ */ jsx("img", {
+							src: event.poster_url,
+							alt: event.title,
+							className: "h-full w-full object-cover"
+						}) : /* @__PURE__ */ jsx("div", {
+							className: "flex h-full items-center justify-center bg-[var(--gradient-neon)]",
+							children: /* @__PURE__ */ jsx("span", {
+								className: "font-display text-2xl uppercase tracking-widest text-primary-foreground",
+								children: event.category
+							})
+						})
+					})
+				}), /* @__PURE__ */ jsxs(Reveal, {
+					delay: 90,
+					className: "space-y-6",
+					children: [
+						/* @__PURE__ */ jsxs("div", { children: [
+							/* @__PURE__ */ jsxs("p", {
+								className: "font-display text-xs uppercase tracking-[0.2em] text-primary",
+								children: [
+									event.institution || "COLLAXP",
+									" · ",
+									event.category,
+									" ·",
+									" ",
+									eventTypeLabel(event.event_type)
+								]
+							}),
+							/* @__PURE__ */ jsx("h1", {
+								className: "mt-2 text-3xl sm:text-4xl",
+								children: event.title
+							}),
+							event.speaker && /* @__PURE__ */ jsxs("p", {
+								className: "mt-2 text-sm text-muted-foreground",
+								children: ["Speaker / host: ", /* @__PURE__ */ jsx("span", {
+									className: "text-foreground",
+									children: event.speaker
+								})]
+							})
+						] }),
+						/* @__PURE__ */ jsxs("dl", {
+							className: "grid gap-3 text-sm",
+							children: [
+								/* @__PURE__ */ jsxs("div", {
+									className: "flex items-center gap-3 text-muted-foreground",
+									children: [/* @__PURE__ */ jsx(CalendarDays, { className: "h-4 w-4 text-primary" }), formatDate(event.event_date)]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "flex items-center gap-3 text-muted-foreground",
+									children: [
+										/* @__PURE__ */ jsx(Clock, { className: "h-4 w-4 text-primary" }),
+										" ",
+										event.start_time
+									]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "flex items-center gap-3 text-muted-foreground",
+									children: [
+										/* @__PURE__ */ jsx(MapPin, { className: "h-4 w-4 text-primary" }),
+										" ",
+										event.location || "To be announced"
+									]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "flex items-center gap-3 text-muted-foreground",
+									children: [
+										/* @__PURE__ */ jsx(ShieldAlert, { className: "h-4 w-4 text-primary" }),
+										" Age restriction:",
+										" ",
+										event.age_restriction
+									]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "flex items-center gap-3 text-muted-foreground",
+									children: [
+										/* @__PURE__ */ jsx(Ticket, { className: "h-4 w-4 text-primary" }),
+										" ",
+										formatPrice(Number(event.price))
+									]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "flex items-center gap-3 text-primary",
+									children: [
+										/* @__PURE__ */ jsx(Zap, { className: "h-4 w-4" }),
+										" +",
+										event.xp_reward,
+										" XP on registration"
+									]
+								})
+							]
+						}),
+						registration ? /* @__PURE__ */ jsxs("div", {
+							className: "panel space-y-3 p-5",
+							children: [/* @__PURE__ */ jsxs("p", {
+								className: "font-display text-sm uppercase tracking-widest text-primary",
+								children: [
+									isRsvpType(event.event_type) ? "RSVP confirmed" : "Registered",
+									" ",
+									"· Ticket ",
+									registration.ticket_no
+								]
+							}), /* @__PURE__ */ jsxs("div", {
+								className: "flex flex-wrap gap-2",
+								children: [/* @__PURE__ */ jsx(Button, {
+									variant: "outline",
+									asChild: true,
+									children: /* @__PURE__ */ jsx(Link, {
+										to: "/my-events",
+										children: "View My Events"
+									})
+								}), /* @__PURE__ */ jsx(Button, {
+									variant: "ghost",
+									onClick: () => cancel.mutate(),
+									disabled: cancel.isPending,
+									children: cancel.isPending ? "Cancelling…" : isRsvpType(event.event_type) ? "Cancel RSVP" : "Cancel registration"
+								})]
+							})]
+						}) : user && role !== "organiser" ? isRsvpType(event.event_type) || Number(event.price) <= 0 ? /* @__PURE__ */ jsx(Button, {
+							size: "lg",
+							className: "w-full",
+							onClick: () => register.mutate(),
+							disabled: register.isPending,
+							children: register.isPending ? "Registering…" : isRsvpType(event.event_type) ? "RSVP — I'm attending" : "Register for this event"
+						}) : /* @__PURE__ */ jsxs("div", {
+							className: "space-y-2",
+							children: [/* @__PURE__ */ jsxs(Button, {
+								size: "lg",
+								className: "w-full",
+								onClick: () => addToCart.mutate({
+									eventId: event.id,
+									quantity: 1
+								}),
+								disabled: addToCart.isPending,
+								children: [/* @__PURE__ */ jsx(ShoppingCart, { className: "mr-2 h-4 w-4" }), addToCart.isPending ? "Adding…" : `Add ticket to cart — ${formatPrice(Number(event.price))}`]
+							}), /* @__PURE__ */ jsx(Button, {
+								variant: "outline",
+								className: "w-full",
+								onClick: () => void navigate({ to: "/cart" }),
+								children: "Go to cart to check out"
+							})]
+						}) : user && role === "organiser" ? /* @__PURE__ */ jsx("p", {
+							className: "panel p-4 text-sm text-muted-foreground",
+							children: "Organiser accounts manage events; sign in with a student account to register."
+						}) : /* @__PURE__ */ jsxs("div", {
+							className: "space-y-3",
+							children: [/* @__PURE__ */ jsx(Button, {
+								size: "lg",
+								className: "w-full",
+								onClick: () => void navigate({ to: "/student-login" }),
+								children: "Sign in to register"
+							}), /* @__PURE__ */ jsxs("p", {
+								className: "text-center text-xs text-muted-foreground",
+								children: [
+									"No account?",
+									" ",
+									/* @__PURE__ */ jsx(Link, {
+										to: "/student-signup",
+										className: "text-primary hover:underline",
+										children: "Create one with your student email"
+									})
+								]
+							})]
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ jsxs(Reveal, {
+				delay: 140,
+				className: "panel mt-10 p-6",
+				children: [
+					/* @__PURE__ */ jsx("h2", {
+						className: "font-display text-lg",
+						children: "About this event"
+					}),
+					/* @__PURE__ */ jsx("p", {
+						className: "mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground",
+						children: event.description || "The organiser has not added a description yet."
+					}),
+					event.agenda && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("h3", {
+						className: "mt-6 font-display text-sm uppercase tracking-widest text-primary",
+						children: "Agenda / event details"
+					}), /* @__PURE__ */ jsx("p", {
+						className: "mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground",
+						children: event.agenda
+					})] })
+				]
+			})
+		]
+	});
+}
+export { EventDetails as component };
