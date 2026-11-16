@@ -1,0 +1,141 @@
+rules_version = '2';
+
+// Firestore security rules for COLLAXP. These replace the Postgres RLS policies.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function isOrganiser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'organiser';
+    }
+    function eventOrganiser(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)).data.organiser_id;
+    }
+
+    // Private profile: only the owner can read or edit it.
+    match /profiles/{uid} {
+      allow read, create, update: if isUser(uid);
+    }
+
+    // Public subset of a profile (shown next to reels and comments).
+    match /public_profiles/{uid} {
+      allow read: if true;
+      allow create, update: if isUser(uid);
+    }
+
+    // One role doc per user, chosen at sign-up. Never changeable from the client.
+    // 'admin' can only be granted from the Firebase console / Admin SDK.
+    match /user_roles/{uid} {
+      allow read: if isUser(uid);
+      allow create: if isUser(uid) && request.resource.data.role in ['student', 'organiser'];
+    }
+
+    match /events/{eventId} {
+      allow read: if resource.data.is_published == true
+        || (signedIn() && resource.data.organiser_id == request.auth.uid);
+      allow create: if isOrganiser() && request.resource.data.organiser_id == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.organiser_id == request.auth.uid
+        && request.resource.data.organiser_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.organiser_id == request.auth.uid;
+    }
+
+    match /event_registrations/{regId} {
+      allow read: if signedIn()
+        && (resource.data.user_id == request.auth.uid
+            || resource.data.organiser_id == request.auth.uid);
+      allow create: if isUser(request.resource.data.user_id)
+        && request.resource.data.attended == false
+        && request.resource.data.organiser_id == eventOrganiser(request.resource.data.event_id);
+      // Organisers can only check tickets in (scanner).
+      allow update: if signedIn()
+        && resource.data.organiser_id == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attended', 'scanned_at']);
+      allow delete: if signedIn()
+        && (resource.data.user_id == request.auth.uid
+            || resource.data.organiser_id == request.auth.uid);
+    }
+
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.user_id == request.auth.uid;
+      // Own notifications, or the "new registration" notice sent to an event's organiser.
+      allow create: if signedIn()
+        && (request.resource.data.user_id == request.auth.uid
+            || (request.resource.data.kind == 'organiser'
+                && request.resource.data.event_id is string
+                && eventOrganiser(request.resource.data.event_id) == request.resource.data.user_id));
+      allow update: if signedIn()
+        && resource.data.user_id == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    // Doc id is "<uid>_<eventId>" so a user has at most one cart line per event.
+    match /cart_items/{id} {
+      allow read, delete: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isUser(request.resource.data.user_id)
+        && id == request.auth.uid + '_' + request.resource.data.event_id
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 10;
+      allow update: if signedIn()
+        && resource.data.user_id == request.auth.uid
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 10;
+    }
+
+    match /orders/{id} {
+      allow read: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isUser(request.resource.data.user_id);
+    }
+
+    match /order_items/{id} {
+      allow read: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isUser(request.resource.data.user_id);
+    }
+
+    match /reels/{reelId} {
+      allow read: if resource.data.is_published == true
+        || (signedIn() && resource.data.organiser_id == request.auth.uid);
+      allow create: if isUser(request.resource.data.organiser_id);
+      allow update: if signedIn()
+        && resource.data.organiser_id == request.auth.uid
+        && request.resource.data.organiser_id == request.auth.uid;
+      allow delete: if signedIn() && resource.data.organiser_id == request.auth.uid;
+    }
+
+    // Doc id is "<reelId>_<uid>" so a user can like a reel only once.
+    match /reel_likes/{id} {
+      allow read: if true;
+      allow create: if isUser(request.resource.data.user_id)
+        && id == request.resource.data.reel_id + '_' + request.auth.uid;
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    match /reel_comments/{id} {
+      allow read: if true;
+      allow create: if isUser(request.resource.data.user_id)
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 600;
+      // Authors can delete their own comments; reel owners can moderate theirs.
+      allow delete: if signedIn()
+        && (resource.data.user_id == request.auth.uid
+            || get(/databases/$(database)/documents/reels/$(resource.data.reel_id)).data.organiser_id == request.auth.uid);
+    }
+
+    match /content_reports/{id} {
+      allow read: if signedIn() && resource.data.reporter_id == request.auth.uid;
+      allow create: if isUser(request.resource.data.reporter_id);
+    }
+  }
+}
